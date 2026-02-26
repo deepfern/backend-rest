@@ -15,7 +15,6 @@ app.config.from_object(Config)
 db = SQLAlchemy(app)
 CORS(app)  # Enable CORS for frontend integration
 
-
 # ---------- Helpers ----------
 
 def iso_utc_z(dt: Optional[datetime]) -> Optional[str]:
