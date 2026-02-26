@@ -40,6 +40,39 @@ spec:
             - name: http
               containerPort: {{ .Values.service.port }}
               protocol: TCP
+          # Environment variables passed to the container at runtime.
+          env:
+            - name: FLASK_PORT
+              value: "{{ .Values.service.port}}"
+            - name: FLASK_HOST
+              value: "0.0.0.0"
+            - name: FLASK_DEBUG
+              value: "false"
+            - name: POSTGRES_DB                     # ENV variable in the container
+              valueFrom:
+                secretKeyRef:
+                  name: application-pguser-admin    # The name of the secret to retrieve data from
+                  key: dbname                       # The secrets key name to retrieve data from
+            - name: POSTGRES_PASSWORD               # ENV variable in the container
+              valueFrom:
+                secretKeyRef:
+                  name: application-pguser-admin    # The name of the secret to retrieve data from
+                  key: password                     # The secrets key name to retrieve data from
+            - name: POSTGRES_PORT                   # ENV variable in the container
+              valueFrom:
+                secretKeyRef:
+                  name: application-pguser-admin    # The name of the secret to retrieve data from
+                  key: port                         # The secrets key name to retrieve data from
+            - name: POSTGRES_USER                   # ENV variable in the container
+              valueFrom:
+                secretKeyRef:
+                  name: application-pguser-admin    # The name of the secret to retrieve data from
+                  key: user                         # The secrets key name to retrieve data from
+            - name: POSTGRES_HOST                   # ENV variable in the container
+              valueFrom:
+                secretKeyRef:
+                  name: application-pguser-admin    # The name of the secret to retrieve data from
+                  key: host                         # The secrets key name to retrieve data from
           livenessProbe:
             {{- toYaml .Values.livenessProbe | nindent 12 }}
           readinessProbe:
