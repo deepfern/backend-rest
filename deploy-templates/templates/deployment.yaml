@@ -43,7 +43,7 @@ spec:
           # Environment variables passed to the container at runtime.
           env:
             - name: FLASK_PORT
-              value: "{{ .Values.service.port}}"
+              value: "{{ .Values.service.port }}"
             - name: FLASK_HOST
               value: "0.0.0.0"
             - name: FLASK_DEBUG

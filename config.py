@@ -40,7 +40,7 @@ class Config:
     HOST = os.getenv('FLASK_HOST', os.getenv('HOST', '0.0.0.0'))
 
     # IMPORTANT: default to 5000 to match typical Helm service.port; allow overrides
-    PORT = int(os.getenv('FLASK_PORT', os.getenv('PORT', '5000')))
+    PORT = int(os.getenv('FLASK_PORT', os.getenv('PORT', '8080')))
 
     @classmethod
     def get_database_uri(cls):
