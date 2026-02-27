@@ -13,14 +13,13 @@ app.config.from_object(Config)
 
 # Initialize extensions
 db = SQLAlchemy(app)
-CORS(app)  # Enable CORS for frontend integration
+CORS(app)
+
 
 # ---------- Helpers ----------
 
-def iso_utc_z(dt: Optional[datetime]) -> Optional[str]:
-    """
-    Convert datetime to ISO-8601 UTC format with trailing 'Z' (e.g. 2024-11-01T10:23:45.123Z).
-    """
+def iso_utc_z(dt: datetime | None) -> str | None:
+    """Convert datetime to ISO-8601 UTC format with trailing 'Z'."""
     if not dt:
         return None
 
@@ -28,10 +27,9 @@ def iso_utc_z(dt: Optional[datetime]) -> Optional[str]:
     s = dt.isoformat(timespec="milliseconds")
 
     if s.endswith("+00:00"):
-        s = s[:-6] + "Z"
-    elif not s.endswith("Z"):
-        s += "Z"
-
+        return s[:-6] + "Z"
+    if not s.endswith("Z"):
+        return s + "Z"
     return s
 
 
@@ -39,7 +37,6 @@ def iso_utc_z(dt: Optional[datetime]) -> Optional[str]:
 
 class Record(db.Model):
     """Database model for records."""
-
     __tablename__ = "records"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -59,7 +56,7 @@ class Record(db.Model):
     )
 
     def to_api_dict(self) -> dict:
-        """Convert object to dictionary for API responses."""
+        """Convert record to API dictionary representation."""
         return {
             "id": self.id,
             "name": self.name,
@@ -70,7 +67,7 @@ class Record(db.Model):
         }
 
     def update_from_dict(self, data: dict):
-        """Update record fields from dictionary."""
+        """Update record from incoming JSON."""
         if "name" in data and isinstance(data["name"], str) and data["name"].strip():
             self.name = data["name"].strip()
         if "message" in data and isinstance(data["message"], str) and data["message"].strip():
@@ -87,13 +84,11 @@ class Record(db.Model):
 @app.route("/")
 def health_check():
     """Health check endpoint."""
-    return jsonify(
-        {
-            "status": "OK",
-            "message": "Flask API is running",
-            "timestamp": iso_utc_z(datetime.now(timezone.utc)),
-        }
-    )
+    return jsonify({
+        "status": "OK",
+        "message": "Flask API is running",
+        "timestamp": iso_utc_z(datetime.now(timezone.utc)),
+    })
 
 
 @app.route("/api/records", methods=["POST"])
@@ -103,26 +98,22 @@ def create_record():
         data = request.get_json(silent=True) or {}
         name = (data.get("name") or "").strip()
         message = (data.get("message") or "").strip()
-        note = data.get("note")
-        note = note.strip() if isinstance(note, str) and note else None
+        note_raw = data.get("note")
+        note = note_raw.strip() if isinstance(note_raw, str) and note_raw else None
 
         if not name or not message:
-            return (
-                jsonify(
-                    {"error": 'Both "name" and "message" must be non-empty strings.'}
-                ),
-                400,
-            )
+            return jsonify(
+                {"error": 'Both "name" and "message" must be non-empty strings.'}
+            ), 400
 
         record = Record(name=name, message=message, note=note)
         db.session.add(record)
         db.session.commit()
-
         return jsonify({"record": record.to_api_dict()}), 201
 
-    except SQLAlchemyError as database_error:
+    except SQLAlchemyError as e:
         db.session.rollback()
-        return jsonify({"error": f"Failed to create record: {database_error}"}), 500
+        return jsonify({"error": f"Failed to create record: {e}"}), 500
 
 
 @app.route("/api/records", methods=["GET"])
@@ -131,9 +122,9 @@ def list_records():
     try:
         records = Record.query.order_by(Record.id.asc()).all()
         payload = [r.to_api_dict() for r in records]
-        return jsonify({"records": payload, "total": len(payload)}), 200
-    except SQLAlchemyError as database_error:
-        return jsonify({"error": f"Failed to fetch records: {database_error}"}), 500
+        return jsonify({"records": payload, "total": len(payload)})
+    except SQLAlchemyError as e:
+        return jsonify({"error": f"Failed to fetch records: {e}"}), 500
 
 
 @app.route("/api/records/<int:record_id>", methods=["PUT"])
@@ -148,14 +139,14 @@ def update_record(record_id):
 
         record.update_from_dict(data)
         db.session.commit()
+        return jsonify({
+            "message": "Record updated successfully",
+            "record": record.to_api_dict()
+        })
 
-        return jsonify(
-            {"message": "Record updated successfully", "record": record.to_api_dict()}
-        ), 200
-
-    except (SQLAlchemyError, ValueError) as database_error:
+    except (SQLAlchemyError, ValueError) as e:
         db.session.rollback()
-        return jsonify({"error": f"Failed to update record: {database_error}"}), 500
+        return jsonify({"error": f"Failed to update record: {e}"}), 500
 
 
 @app.route("/api/records/<int:record_id>", methods=["DELETE"])
@@ -165,15 +156,36 @@ def delete_record(record_id):
         record = Record.query.get_or_404(record_id)
         db.session.delete(record)
         db.session.commit()
-        return jsonify({"message": "Record deleted successfully"}), 200
+        return jsonify({"message": "Record deleted successfully"})
 
-    except SQLAlchemyError as database_error:
+    except SQLAlchemyError as e:
         db.session.rollback()
-        return jsonify({"error": f"Failed to delete record: {database_error}"}), 500
+        return jsonify({"error": f"Failed to delete record: {e}"}), 500
 
 
 # ---------- Error handlers ----------
 
 @app.errorhandler(404)
-def not_found(_error):
-    """Return JSON for a 404 error."""
+def not_found(_):
+    return jsonify({"error": "Endpoint not found"}), 404
+
+
+@app.errorhandler(500)
+def internal_error(_):
+    return jsonify({"error": "Internal server error"}), 500
+
+
+# ---------- DB bootstrap ----------
+
+def create_tables():
+    """Create database tables."""
+    try:
+        with app.app_context():
+            db.create_all()
+    except SQLAlchemyError as e:
+        print(f"Error creating database tables: {e}")
+
+
+if __name__ == "__main__":
+    create_tables()
+    app.run(host=Config.HOST, port=Config.PORT, debug=Config.DEBUG)

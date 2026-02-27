@@ -11,7 +11,8 @@ image:
   tag: ""
 
 imagePullSecrets: []
-# Define secret to pull images. Secret can be provisioned by edp-install or manually.- name: regcred
+# Define secret to pull images. Secret can be provisioned by edp-install or manually.
+# - name: regcred
 
 nameOverride: ""
 fullnameOverride: ""
